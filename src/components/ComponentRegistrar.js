@@ -3,6 +3,7 @@ let Dependencies = require('../Dependencies');
 let mergeWebpackConfig = require('../builder/MergeWebpackConfig');
 
 let components = [
+    'Group',
     'JavaScript',
     'Preact',
     'React',
@@ -65,7 +66,8 @@ class ComponentRegistrar {
      * @param {Component} Component
      */
     install(Component) {
-        let component = typeof Component === 'function' ? new Component() : Component;
+        let component =
+            typeof Component === 'function' ? new Component(this.mix) : Component;
 
         this.registerComponent(component);
 

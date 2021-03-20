@@ -10,5 +10,5 @@ module.exports = async () => {
     await mix.installDependencies();
     await mix.init();
 
-    return mix.build();
+    return await mix.build();
 };

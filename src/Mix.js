@@ -14,6 +14,11 @@ let { Resolver } = require('./Resolver');
 
 /** @typedef {import("./tasks/Task")} Task */
 
+/**
+ * @typedef {object} ContextOptions
+ * @property {string} name
+ */
+
 class Mix {
     /** @type {Mix|null} */
     static _primary = null;
@@ -21,10 +26,16 @@ class Mix {
     /** @type {Record<string, boolean>} */
     static _hasWarned = {};
 
+    /** @type {Mix[]} */
+    static current = [];
+
     /**
      * Create a new instance.
+     * @param {Partial<ContextOptions>} options
      */
-    constructor() {
+    constructor(options = {}) {
+        this.options = this.resolveOptions(options);
+
         /** @type {ReturnType<buildConfig>} */
         this.config = buildConfig(this);
 
@@ -40,6 +51,9 @@ class Mix {
 
         /** @type {Task[]} */
         this.tasks = [];
+
+        /** @type {Mix[]} */
+        this.children = [];
 
         this.booted = false;
 
@@ -65,6 +79,23 @@ class Mix {
     }
 
     /**
+     * Create a new instance.
+     * @param {Partial<ContextOptions>} options
+     * @returns {ContextOptions}
+     */
+    resolveOptions(options) {
+        /** @type {ContextOptions} */
+        const defaults = {
+            name: 'Mix'
+        };
+
+        return {
+            ...defaults,
+            ...options
+        };
+    }
+
+    /**
      * @internal
      */
     static get primary() {
@@ -73,6 +104,7 @@ class Mix {
 
     /**
      * @internal
+     * @returns {Promise<import('webpack').Configuration[]>}
      */
     async build() {
         if (!this.booted) {
@@ -83,11 +115,31 @@ class Mix {
             this.boot();
         }
 
-        return this.webpackConfig.build();
+        return await Promise.all(this.buildConfigs());
+    }
+
+    /**
+     * Build the webpack configs for this context and all of its children
+     *
+     * @internal
+     * @returns {Generator<Promise<import('webpack').Configuration>, any, undefined>}
+     */
+    *buildConfigs() {
+        // We do not want to build this config if it doesn't do anything
+        // This is because it will produce no files but still result in progress output
+        // This is likely not what the user would expect
+        if (this.children.length === 0) {
+            yield this.webpackConfig.build();
+        }
+
+        for (const child of this.children) {
+            yield* child.buildConfigs();
+        }
     }
 
     /**
      * @internal
+     * @returns {Mix}
      */
     boot() {
         if (this.booted) {
@@ -96,8 +148,10 @@ class Mix {
 
         this.booted = true;
 
-        // Load .env
-        Dotenv.config();
+        if (this === Mix._primary) {
+            // Load .env
+            Dotenv.config();
+        }
 
         // If we're using Laravel set the public path by default
         if (this.sees('laravel')) {
@@ -105,7 +159,7 @@ class Mix {
         }
 
         this.listen('init', () => this.hot.record());
-        this.makeCurrent();
+        this.pushCurrent();
 
         return this;
     }
@@ -115,6 +169,7 @@ class Mix {
      */
     async installDependencies() {
         await this.dispatch('internal:gather-dependencies');
+        await this.dispatchToChildren('internal:gather-dependencies');
 
         Dependencies.installQueued();
     }
@@ -122,14 +177,15 @@ class Mix {
     /**
      * @internal
      */
-    init() {
+    async init() {
         if (this.initialized) {
             return;
         }
 
         this.initialized = true;
 
-        return this.dispatch('init', this);
+        await this.dispatch('init', this);
+        await this.dispatchToChildren('init', this);
     }
 
     /**
@@ -243,11 +299,26 @@ class Mix {
      * @param {any | (() => any)}      [data]
      */
     async dispatch(event, data) {
-        if (typeof data === 'function') {
-            data = data();
-        }
+        return this.whileCurrent(() => {
+            if (typeof data === 'function') {
+                data = data();
+            }
 
-        return this.dispatcher.fire(event, data);
+            return this.dispatcher.fire(event, data);
+        });
+    }
+
+    /**
+     * Dispatch the given event.
+     *
+     * @param {string} event
+     * @param {any | (() => any)}      [data]
+     */
+    async dispatchToChildren(event, data) {
+        const promises = this.children.map(child => child.dispatch(event, data));
+        const results = await Promise.all(promises);
+
+        return results;
     }
 
     /**
@@ -256,6 +327,53 @@ class Mix {
      */
     resolve(name) {
         return this.resolver.get(name);
+    }
+
+    pushCurrent() {
+        Mix.current.push(this.makeCurrent());
+    }
+
+    popCurrent() {
+        Mix.current.pop();
+
+        const context = Mix.current[Mix.current.length - 1];
+
+        context && context.makeCurrent();
+    }
+
+    /**
+     * @template T
+     * @param {string} name
+     * @param {(context: Mix) => T|Promise<T>} callback
+     */
+    withChild(name, callback) {
+        const context = new Mix({ name }).boot();
+
+        this.children.push(context);
+
+        return context.whileCurrent(callback);
+    }
+
+    /**
+     * @template T
+     * @param {(context: Mix) => T|Promise<T>} callback
+     */
+    whileCurrent(callback) {
+        this.pushCurrent();
+
+        try {
+            const result = callback(this);
+
+            if (result instanceof Promise) {
+                return result.finally(() => this.popCurrent());
+            }
+        } catch (err) {
+            this.popCurrent();
+
+            throw err;
+        }
+
+        this.popCurrent();
     }
 
     /**

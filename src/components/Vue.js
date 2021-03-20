@@ -8,9 +8,11 @@ let AppendVueStylesPlugin = require('../webpackPlugins/Css/AppendVueStylesPlugin
 class Vue {
     /**
      * Create a new component instance.
+     * @param {import('../Mix')} mix
      */
-    constructor() {
-        this.chunks = Chunks.instance();
+    constructor(mix) {
+        this._mix = mix;
+        this.chunks = mix.chunks;
     }
 
     /**
@@ -46,8 +48,8 @@ class Vue {
             options
         );
 
-        Mix.globalStyles = this.options.globalStyles;
-        Mix.extractingStyles = !!this.options.extractStyles;
+        this._mix.globalStyles = this.options.globalStyles;
+        this._mix.extractingStyles = !!this.options.extractStyles;
     }
 
     /**
@@ -80,7 +82,7 @@ class Vue {
             use: [
                 {
                     loader: this._mix.resolve('vue-loader'),
-                    options: this.options.options || Config.vue || {}
+                    options: this.options.options || this._mix.config.vue || {}
                 }
             ]
         });
@@ -113,6 +115,8 @@ class Vue {
      * webpack plugins to be appended to the master config.
      */
     webpackPlugins() {
+        console.log(this._mix.options.name);
+
         let { VueLoaderPlugin } = require(this._mix.resolve('vue-loader'));
 
         return [new VueLoaderPlugin(), new AppendVueStylesPlugin()];
@@ -188,16 +192,7 @@ class Vue {
                 ? this.options.extractStyles
                 : '/css/vue-styles.css';
 
-        return fileName.replace(Config.publicPath, '').replace(/^\//, '');
-    }
-
-    /**
-     * @internal
-     * @returns {import("../Mix")}
-     **/
-    get _mix() {
-        // @ts-ignore
-        return global.Mix;
+        return fileName.replace(this._mix.config.publicPath, '').replace(/^\//, '');
     }
 }
 
