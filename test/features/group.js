@@ -14,8 +14,8 @@ test('it can build multiple configs at once', async t => {
         });
     });
 
-    mix.group('two', (mix, context) => {
-        setupVueAliases(2, context);
+    mix.group('two', mix => {
+        setupVueAliases(2);
 
         mix.js('test/fixtures/app/src/extract/app.js', 'js/app2.js');
         mix.alias({

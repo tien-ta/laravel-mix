@@ -313,6 +313,7 @@ class Mix {
      *
      * @param {string} event
      * @param {any | (() => any)}      [data]
+     * @internal
      */
     async dispatchToChildren(event, data) {
         const promises = this.children.map(child => child.dispatch(event, data));
@@ -329,10 +330,12 @@ class Mix {
         return this.resolver.get(name);
     }
 
+    /** @internal */
     pushCurrent() {
         Mix.current.push(this.makeCurrent());
     }
 
+    /** @internal */
     popCurrent() {
         Mix.current.pop();
 
@@ -342,6 +345,7 @@ class Mix {
     }
 
     /**
+     * @internal
      * @template T
      * @param {string} name
      * @param {(context: Mix) => T|Promise<T>} callback
@@ -355,6 +359,7 @@ class Mix {
     }
 
     /**
+     * @internal
      * @template T
      * @param {(context: Mix) => T|Promise<T>} callback
      */
@@ -367,13 +372,15 @@ class Mix {
             if (result instanceof Promise) {
                 return result.finally(() => this.popCurrent());
             }
+
+            this.popCurrent();
+
+            return result;
         } catch (err) {
             this.popCurrent();
 
             throw err;
         }
-
-        this.popCurrent();
     }
 
     /**

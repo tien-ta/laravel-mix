@@ -72,7 +72,11 @@ export async function compile(config = []) {
  *
  * @param {string|number} version
  */
-export function setupVueAliases(version, context = Mix) {
+export function setupVueAliases(version) {
+    /** @type {typeof Mix} */
+    // @ts-ignore
+    const context = global.Mix;
+
     const vueModule = version === 3 ? 'vue3' : 'vue2';
     const vueLoaderModule = version === 3 ? 'vue-loader16' : 'vue-loader15';
 
