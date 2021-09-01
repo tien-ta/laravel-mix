@@ -20,7 +20,7 @@ import { VueLoaderOptions } from 'vue-loader';
 import MixHelpers from '../src/Mix';
 
 // General API
-export interface Api {
+interface Api {
     /** Set the public path */
     setPublicPath(path: string): Api;
 
@@ -56,7 +56,7 @@ export interface Api {
 }
 
 // Webpack config related abilities
-export interface Api {
+interface Api {
     /** Merge custom webpack config */
     webpackConfig(config: webpack.Configuration): Api;
 
@@ -82,7 +82,7 @@ export interface Api {
 }
 
 // Assorted capabilities
-export interface Api {
+interface Api {
     /** Add webpack-resolution aliases */
     alias(paths: Record<string, string>): Api;
 
@@ -117,7 +117,7 @@ export interface Api {
 }
 
 // JS / Transpilation capabilities
-export interface Api {
+interface Api {
     /**
      * Compile modern javascript
      *
@@ -148,7 +148,7 @@ export interface Api {
 }
 
 // File related capabilities
-export interface Api {
+interface Api {
     /** Copy files specified by `from` and place them in `to` */
     copy(from: string | string[], to: string): Api;
 
@@ -192,7 +192,7 @@ export interface Api {
 }
 
 // Styling related capabilities
-export interface Api {
+interface Api {
     /** Compile CSS via PostCSS */
     css(src: string, output: string, plugins?: AcceptedPlugin[]): Api;
 
@@ -241,7 +241,7 @@ export interface Api {
 }
 
 // Vendor extraction
-export interface Api {
+interface Api {
     /** Extract all matching chunks to `config.to` / `output` / vendor.js  */
     extract(config: Partial<ExtractTypes.Extraction>, output?: string): Api;
 
@@ -255,7 +255,7 @@ export interface Api {
     extract(output?: string): Api;
 }
 
-export type VueConfig = {
+type VueConfig = {
     /** Which version of Vue to support. Detected automatically if not given. */
     version?: number;
 
@@ -276,7 +276,7 @@ export type VueConfig = {
 };
 
 // Third-party support "feature flags"
-export interface Api {
+interface Api {
     /** Enable support for Preact */
     preact(): Api;
 
@@ -293,5 +293,9 @@ export interface Api {
     vue(config?: VueConfig): Api;
 }
 
-declare const api: Api;
-export default api;
+declare const exports: Api;
+declare namespace exports {
+    export { Api, VueConfig };
+}
+
+export = exports;
